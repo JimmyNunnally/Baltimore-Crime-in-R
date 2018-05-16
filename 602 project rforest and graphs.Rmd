@@ -1,0 +1,87 @@
+#Initiating the librariers that we will need
+library(tidyverse)
+library(readxl)
+
+
+
+```{r}
+# Read the Data
+setwd("/Users/jimmy/AnacondaProjects/Data602/Group Project")
+Crime = read_excel(path = "Model_Data_for_Crimes.xlsx", sheet ="Model_Data_for_Crime")
+```
+
+
+
+```{r}
+#generating test/train split
+## 75% of the sample size
+smp_size <- floor(0.75 * nrow(Crime))
+
+## seed for reproductible results
+set.seed(123)
+train_ind <- sample(seq_len(nrow(Crime)), size = smp_size)
+
+train <- Crime[train_ind, ]
+test <- Crime[-train_ind, ]
+```
+
+```{r}
+#more librariers to be used in this chunk
+library(randomForest)
+library(miscTools)
+library(ggplot2)
+
+
+#generating test/train split
+## 75% of the sample size
+smp_size <- floor(0.75 * nrow(Crime))
+
+## seed for reproductible results
+set.seed(123)
+train_ind <- sample(seq_len(nrow(Crime)), size = smp_size)
+
+train <- Crime[train_ind, ]
+test <- Crime[-train_ind, ]
+
+#Creating the random forest
+cols <- c('Total_Incidents','Day_of_Week_D', 'District_Var','avg_temp','high_temp', 'low_temp','high_dew_point','avg_dew_point','low_dew_point','high_humidity','avg_humidity','low_humidity','high_wind','avg_wind')
+rf <- randomForest(Total_Incidents ~ ., data=train[,cols], ntree=500)
+
+#Determining performance
+(r2 <- rSquared(test$Total_Incidents, test$Total_Incidents - predict(rf, test[,cols])))
+(mse <- mean((test$Total_Incidents - predict(rf, test[,cols]))^2))
+
+
+#Plotting the residual sum squared
+p <- ggplot(aes(x=actual, y=pred),
+  data=data.frame(actual=test$Total_Incidents, pred=predict(rf, test[,cols])))
+p + geom_point() +
+	geom_abline(color="red") +
+	ggtitle(paste("RandomForest Regression in R r^2=", r2, sep=""))
+
+#Graphing variables in order of importance
+varImpPlot(rf)
+
+```
+
+
+
+
+```{r}
+# Lets explore the Districts in more detail:
+library(dplyr)
+ti_by_district <- Crime %>%
+  group_by(District) %>%
+  summarise(mean_total_incident=mean(Total_Incidents),
+            median_total_incidents=median(Total_Incidents),
+            n=n()) %>%
+  ungroup() %>% 
+  arrange(District)
+
+# We now have a new data set with grouped districts
+# This helps us to graphically represent the massive variance between districts
+
+ggplot(ti_by_district, aes(x=District, y=mean_total_incident))+geom_point()
+
+```
+
